@@ -269,8 +269,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let quitItem = NSMenuItem(title: "Quit Portsly", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         menu.addItem(quitItem)
         
-        _ = Date().timeIntervalSince(startTime)
-        // if debugTiming { print("Portsly: Total menu update took \(totalTime)s") }
+        let totalTime = Date().timeIntervalSince(startTime)
+        let totalTimeMs = totalTime * 1000
+        print(String(format: "[%.0fms] Portsly: Total menu update", totalTimeMs))
     }
     
     @objc func killProcess(_ sender: NSMenuItem) {

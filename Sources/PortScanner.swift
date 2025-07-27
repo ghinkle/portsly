@@ -357,28 +357,7 @@ class PortScanner {
             processNameToPids[baseName]?.append(pid)
         }
         
-        // Batch get all app paths for icon extraction
-        let iconPids = processNameToPids.flatMap { $0.value }
-        var pidToAppPath: [Int: String] = [:]
-        
-        if !iconPids.isEmpty {
-            let pidsStr = iconPids.map { String($0) }.joined(separator: ",")
-            let lsofAppsOutput = shell("lsof -p \(pidsStr) | grep -E '\\.app/Contents/MacOS'")
-            
-            for line in lsofAppsOutput.components(separatedBy: .newlines) {
-                if line.isEmpty { continue }
-                let components = line.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
-                if components.count >= 9, let pid = Int(components[1]) {
-                    // Extract the .app path
-                    if let appRange = line.range(of: #"(/[^:]+\.app)/Contents/MacOS"#, options: .regularExpression) {
-                        let appPath = String(line[appRange]).replacingOccurrences(of: "/Contents/MacOS", with: "")
-                        pidToAppPath[pid] = appPath
-                    }
-                }
-            }
-        }
-        
-        // Get icon for each unique process name
+        // Get icon for each unique process name using a more efficient approach
         for (processName, pids) in processNameToPids {
             // Check cache first
             if let cachedIcon = iconCache[processName] {
@@ -388,12 +367,36 @@ class PortScanner {
                 continue
             }
             
-            // Get icon for processes with app paths
+            // Skip icon loading for known command-line tools
+            let lowerName = processName.lowercased()
+            if lowerName == "node" || lowerName.contains("python") || lowerName == "java" || 
+               lowerName == "ruby" || lowerName == "go" || lowerName == "rust" || lowerName == "php" {
+                continue
+            }
+            
+            // Try to get icon using NSRunningApplication (fast for GUI apps)
             var icon: NSImage?
             for pid in pids {
-                if let appPath = pidToAppPath[pid] {
-                    icon = getProcessIconFromAppPath(appPath: appPath)
-                    if icon != nil { break }
+                if let app = NSRunningApplication(processIdentifier: pid_t(pid)) {
+                    icon = app.icon
+                    if icon != nil {
+                        icon?.size = NSSize(width: 16, height: 16)
+                        break
+                    }
+                }
+            }
+            
+            // If no icon found and it looks like it might be an app, try one targeted lsof call
+            if icon == nil && !processName.contains(".") && !processName.contains("/") {
+                if let firstPid = pids.first {
+                    // Single pid lookup is much faster than batch
+                    let appPath = shell("lsof -p \(firstPid) | grep -E '\\.app/Contents/MacOS' | head -1").trimmingCharacters(in: .whitespacesAndNewlines)
+                    if !appPath.isEmpty {
+                        if let appRange = appPath.range(of: #"(/[^:]+\.app)/Contents/MacOS"#, options: .regularExpression) {
+                            let appBundlePath = String(appPath[appRange]).replacingOccurrences(of: "/Contents/MacOS", with: "")
+                            icon = getProcessIconFromAppPath(appPath: appBundlePath)
+                        }
+                    }
                 }
             }
             
@@ -413,10 +416,34 @@ class PortScanner {
                     for pid in dockerPids {
                         pidToIcon[pid] = cachedIcon
                     }
-                } else if let icon = getProcessIcon(pid: dockerPid, processName: "Docker") {
-                    iconCache["Docker"] = icon
-                    for pid in dockerPids {
-                        pidToIcon[pid] = icon
+                } else {
+                    // Try to get Docker icon using NSRunningApplication
+                    if let app = NSRunningApplication(processIdentifier: pid_t(dockerPid)) {
+                        let icon = app.icon
+                        icon?.size = NSSize(width: 16, height: 16)
+                        iconCache["Docker"] = icon
+                        for pid in dockerPids {
+                            pidToIcon[pid] = icon
+                        }
+                    } else {
+                        // Try to find Docker app icon
+                        let dockerAppPaths = [
+                            "/Applications/Docker.app",
+                            "/System/Volumes/Preboot/Cryptexes/App/System/Applications/Docker.app",
+                            NSHomeDirectory() + "/Applications/Docker.app"
+                        ]
+                        
+                        for path in dockerAppPaths {
+                            if FileManager.default.fileExists(atPath: path) {
+                                let icon = NSWorkspace.shared.icon(forFile: path)
+                                icon.size = NSSize(width: 16, height: 16)
+                                iconCache["Docker"] = icon
+                                for pid in dockerPids {
+                                    pidToIcon[pid] = icon
+                                }
+                                break
+                            }
+                        }
                     }
                 }
             }
@@ -446,7 +473,8 @@ class PortScanner {
         
         if debugTiming { 
             let totalTime = Date().timeIntervalSince(startTime)
-            print("Portsly: Total scanPorts took \(totalTime)s") 
+            let totalTimeMs = totalTime * 1000
+            print(String(format: "[%.0fms] Portsly: Total scanPorts", totalTimeMs))
         }
         
         return result
@@ -679,43 +707,6 @@ class PortScanner {
         return icon
     }
     
-    private func getProcessIcon(pid: Int, processName: String) -> NSImage? {
-        // Skip icon lookup for certain processes
-        if processName.contains("node") || processName.contains("python") || processName.contains("java") {
-            return nil
-        }
-        
-        // Get the app bundle path for the process
-        let appPath = shell("lsof -p \(pid) | grep -E '\\.app/Contents/MacOS' | head -1").trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        if !appPath.isEmpty {
-            // Extract the .app path
-            if let appRange = appPath.range(of: #"(/[^:]+\.app)/Contents/MacOS"#, options: .regularExpression) {
-                let appBundlePath = String(appPath[appRange]).replacingOccurrences(of: "/Contents/MacOS", with: "")
-                
-                // Get icon from app bundle
-                if let bundle = Bundle(path: appBundlePath),
-                   let iconFile = bundle.object(forInfoDictionaryKey: "CFBundleIconFile") as? String {
-                    let iconPath = bundle.path(forResource: iconFile.replacingOccurrences(of: ".icns", with: ""), ofType: "icns")
-                        ?? bundle.path(forResource: iconFile, ofType: nil)
-                    
-                    if let iconPath = iconPath,
-                       let icon = NSImage(contentsOfFile: iconPath) {
-                        icon.size = NSSize(width: 16, height: 16)
-                        return icon
-                    }
-                }
-                
-                // Try to get icon using NSWorkspace
-                let icon = NSWorkspace.shared.icon(forFile: appBundlePath)
-                icon.size = NSSize(width: 16, height: 16)
-                return icon
-            }
-        }
-        
-        // For non-app processes, return nil (we'll handle generic icons elsewhere)
-        return nil
-    }
     
     private func shell(_ command: String) -> String {
         let startTime = debugTiming ? Date() : nil
@@ -743,7 +734,8 @@ class PortScanner {
             
             if let startTime = startTime {
                 let elapsed = Date().timeIntervalSince(startTime)
-                print("Portsly: '\(command)' took \(elapsed)s")
+                let elapsedMs = elapsed * 1000
+                print(String(format: "[%.0fms] Portsly Shell Command: '%@'", elapsedMs, command))
             }
             
             return result
