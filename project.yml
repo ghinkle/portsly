@@ -3,6 +3,7 @@ options:
   bundleIdPrefix: com.portsly
   deploymentTarget:
     macOS: '12.0'
+  derivedDataPath: build
 targets:
   Portsly:
     type: application
@@ -10,13 +11,11 @@ targets:
     sources:
       - Sources
       - Resources
-      - Assets.xcassets
     resources:
       - Resources
-      - Assets.xcassets
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.portsly.app
+        PRODUCT_BUNDLE_IDENTIFIER: dev.brightbase.portsly
         PRODUCT_NAME: Portsly
         MARKETING_VERSION: 1.0.0
         CURRENT_PROJECT_VERSION: 1
@@ -25,21 +24,11 @@ targets:
         INFOPLIST_KEY_NSMainStoryboardFile: ""
         INFOPLIST_KEY_LSUIElement: YES
         INFOPLIST_KEY_NSPrincipalClass: NSApplication
-        GENERATE_INFOPLIST_FILE: NO
+        GENERATE_INFOPLIST_FILE: YES
         INFOPLIST_KEY_NSHighResolutionCapable: YES
         SWIFT_VERSION: 5.9
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: Resources/Portsly.entitlements
         CODE_SIGN_STYLE: Automatic
-        DEVELOPMENT_TEAM: ""
-    info:
-      path: Resources/Info.plist
-      properties:
-        CFBundleName: Portsly
-        CFBundleIdentifier: com.portsly.app
-        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
-        CFBundleShortVersionString: $(MARKETING_VERSION)
-        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
-        LSUIElement: true
-        NSHighResolutionCapable: true
+        DEVELOPMENT_TEAM: "3GYP4YJ3DH"

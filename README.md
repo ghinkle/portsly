@@ -6,14 +6,22 @@ A lightweight macOS menu bar app that shows which applications are listening on 
 
 ## Features
 
-- 📊 View all listening TCP ports at a glance
-- 🔍 See which process is using each port
-- 📁 View working directories of processes
-- 🚀 Quick "Open in Browser" for web services
-- ⚡ Kill processes with one click (with confirmation)
-- 🐳 Docker container name detection
-- 🎯 Smart process name enhancement (shows project names from package.json, pyproject.toml, etc.)
-- 🚫 Filters out system processes by default (toggleable)
+- View all listening TCP ports and their processes at a glance
+- View PIDs, commands and working directories
+- Quick "Open in Browser" for web services
+- Kill processes with one click (with confirmation)
+- Smart name detection for NodeJS apps, Docker, Python and other dev tools
+- Filters for dev processes and system process
+- Toggleable filters out system processes by default
+
+## Usage
+
+1. Click the Portsly icon in your menu bar
+2. View all processes listening on TCP ports
+3. Click on any port to see options:
+- **Open in Browser**: Opens `http://localhost:PORT` in your default browser
+- **Kill Process**: Sends SIGTERM to the process
+- **Force Quit**: Sends SIGKILL to the process
 
 ## Installation
 
@@ -42,18 +50,12 @@ open Portsly.xcodeproj
 # Then build and run in Xcode (⌘+R)
 ```
 
-## Usage
-
-1. Click the Portsly icon in your menu bar
-2. View all processes listening on TCP ports
-3. Click on any port to see options:
-   - **Open in Browser**: Opens `http://localhost:PORT` in your default browser
-   - **Kill Process**: Sends SIGTERM to the process
-   - **Force Quit**: Sends SIGKILL to the process
+## 
 
 ## Privacy & Security
 
-Portsly requires no special permissions and runs entirely locally. It uses standard macOS commands (`lsof`, `ps`) to gather information about listening ports.
+Portsly runs shell commands to load network ports and command information. There is no telemetry. This is just a simple, free utility.
+
 
 ## Contributing
 
@@ -65,6 +67,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Acknowledgments
 
-- Built with Swift and SwiftUI
 - Uses XcodeGen for project generation
-- Icon designed with [Your Icon Tool]
+- Built with Swift and SwiftUI
